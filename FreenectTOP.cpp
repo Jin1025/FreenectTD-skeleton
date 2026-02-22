@@ -321,6 +321,40 @@ void FreenectTOP::setupParameters(TD::OP_ParameterManager* manager, void*) {
     fn2_irResParam.clampMins[1] = fn2_irResParam.clampMaxes[1] = true;
     manager->appendXY(fn2_irResParam);
     
+    // --------------
+    // SKELETON PAGE
+    // --------------
+    
+    OP_NumericParameter enableSkeletonParam;
+    enableSkeletonParam.name = "Enableskeleton";
+    enableSkeletonParam.label = "Enable Skeleton";
+    enableSkeletonParam.page = "Skeleton";
+    enableSkeletonParam.defaultValues[0] = 0.0;
+    enableSkeletonParam.minValues[0] = enableSkeletonParam.minSliders[0] = 0.0;
+    enableSkeletonParam.maxValues[0] = enableSkeletonParam.maxSliders[0] = 1.0;
+    enableSkeletonParam.clampMins[0] = enableSkeletonParam.clampMaxes[0] = true;
+    manager->appendToggle(enableSkeletonParam);
+    
+    OP_NumericParameter maxPlayersParam;
+    maxPlayersParam.name = "Maxplayers";
+    maxPlayersParam.label = "Max Players";
+    maxPlayersParam.page = "Skeleton";
+    maxPlayersParam.defaultValues[0] = 1.0;
+    maxPlayersParam.minValues[0] = maxPlayersParam.minSliders[0] = 1.0;
+    maxPlayersParam.maxValues[0] = maxPlayersParam.maxSliders[0] = 6.0;
+    maxPlayersParam.clampMins[0] = maxPlayersParam.clampMaxes[0] = true;
+    manager->appendInt(maxPlayersParam);
+    
+    OP_NumericParameter detectorIntervalParam;
+    detectorIntervalParam.name = "Detectorinterval";
+    detectorIntervalParam.label = "Detector Interval";
+    detectorIntervalParam.page = "Skeleton";
+    detectorIntervalParam.defaultValues[0] = 5.0;
+    detectorIntervalParam.minValues[0] = detectorIntervalParam.minSliders[0] = 1.0;
+    detectorIntervalParam.maxValues[0] = detectorIntervalParam.maxSliders[0] = 30.0;
+    detectorIntervalParam.clampMins[0] = detectorIntervalParam.clampMaxes[0] = true;
+    manager->appendInt(detectorIntervalParam);
+
     // ----------
     // ABOUT PAGE
     // ----------
@@ -387,9 +421,9 @@ FreenectTOP::FreenectTOP(const TD::OP_NodeInfo* info, TD::TOP_Context* context)
 // Destructor for FreenectTOP
 FreenectTOP::~FreenectTOP() {
     LOG("[FreenectTOP] Destructor called, cleaning up devices");
+    skeletonTracker.shutdown();
     fn2_cleanupDevice();
     fn1_cleanupDevice();
-    //fallbackBuffer.release(); // Release fallback buffer
 }
 
 // Init for Kinect v1 (libfreenect)
@@ -716,6 +750,10 @@ void FreenectTOP::fn1_execute(TD::TOP_Output* output, const TD::OP_Inputs* input
         info.colorBufferIndex = 0;
         info.firstPixel = TD::TOP_FirstPixel::TopLeft;
         output->uploadBuffer(&colorFrameBuffer, info, nullptr);
+        
+        if (skeletonEnabled && skeletonInitialized) {
+            skeletonTracker.submitFrame(colorFrame.data(), fn1_colorW, fn1_colorH);
+        }
     } else {
         LOG("[FreenectTOP] executeV1: failed to create color output buffer");
     }
@@ -786,6 +824,11 @@ void FreenectTOP::fn2_execute(TD::TOP_Output* output, const TD::OP_Inputs* input
         info.colorBufferIndex = 0;
         info.firstPixel = TD::TOP_FirstPixel::TopLeft;
         output->uploadBuffer(&colorFrameBuffer, info, nullptr);
+        
+        // Feed RGB to skeleton tracker (non-blocking)
+        if (skeletonEnabled && skeletonInitialized) {
+            skeletonTracker.submitFrame(colorFrame.data(), fn2_colorW, fn2_colorH);
+        }
     }
     
     // --- Depth frame ---
@@ -887,6 +930,56 @@ void FreenectTOP::execute(TD::TOP_Output* output, const TD::OP_Inputs* inputs, v
     streamEnabledDepth = (inputs->getParInt("Enabledepth") != 0);
     streamEnabledPC = (inputs->getParInt("Enablepointcloud") != 0);
     
+    skeletonEnabled = (inputs->getParInt("Enableskeleton") != 0);
+    skeletonMaxPlayers = static_cast<int>(inputs->getParInt("Maxplayers"));
+    int detInterval = static_cast<int>(inputs->getParInt("Detectorinterval"));
+
+    // Initialize skeleton tracker if needed
+    if (skeletonEnabled && !skeletonInitialized) {
+        if (skeletonModelDir.empty() && fntdNodeInfo && fntdNodeInfo->pluginPath) {
+            // pluginPath = directory containing the binary (e.g. .plugin/Contents/MacOS/)
+            std::string binDir = std::string(fntdNodeInfo->pluginPath);
+            // Try multiple model search paths
+            std::string candidates[] = {
+                binDir + "/Contents/Resources/models",   // pluginPath = .plugin bundle root
+                binDir + "/../../Resources/models",      // pluginPath = Contents/MacOS/
+                binDir + "/../Resources/models",         // pluginPath = Contents/
+                binDir + "/../../../models",             // Development: sibling of .plugin
+                binDir + "/../../../../models",          // Development: project root
+            };
+            for (const auto& path : candidates) {
+                FILE* f = fopen((path + "/pose_detection.onnx").c_str(), "r");
+                if (f) {
+                    fclose(f);
+                    skeletonModelDir = path;
+                    LOG("[FreenectTOP] Found skeleton models at: " + path);
+                    break;
+                }
+            }
+            if (skeletonModelDir.empty()) {
+                LOG("[FreenectTOP] Could not find skeleton models in any search path");
+                warningString = "Skeleton: models not found (pluginPath=" + binDir + ")";
+            }
+        }
+        if (!skeletonModelDir.empty()) {
+            skeletonInitialized = skeletonTracker.initialize(skeletonModelDir, skeletonMaxPlayers);
+            if (!skeletonInitialized) {
+                warningString = "Failed to initialize skeleton tracker";
+            }
+        }
+    }
+    if (skeletonInitialized) {
+        skeletonTracker.setMaxPlayers(skeletonMaxPlayers);
+        skeletonTracker.setDetectorInterval(detInterval);
+    }
+    if (!skeletonEnabled && skeletonInitialized) {
+        skeletonTracker.shutdown();
+        skeletonInitialized = false;
+    }
+    
+    inputs->enablePar("Maxplayers", skeletonEnabled);
+    inputs->enablePar("Detectorinterval", skeletonEnabled);
+    
     fn1_tilt = static_cast<float>(inputs->getParDouble("Tilt"));
     
     // V1 resolution values
@@ -968,7 +1061,7 @@ void FreenectTOP::execute(TD::TOP_Output* output, const TD::OP_Inputs* inputs, v
         uploadFallbackBuffer();
         errorString.clear();
         return;
-    } else {
+    } else if (warningString == "FreenectTOP is inactive") {
         warningString.clear();
     }
     
@@ -985,6 +1078,77 @@ void FreenectTOP::execute(TD::TOP_Output* output, const TD::OP_Inputs* inputs, v
     } else {
         fn1_execute(output, inputs);
     }
+}
+
+// ───────────────────────────────────────────────────────────────
+// Info CHOP: output skeleton joint data as CHOP channels
+// Channel naming follows Kinect CHOP convention: p{N}/{joint}:{tx|ty|tz|tracked}
+// ───────────────────────────────────────────────────────────────
+
+int32_t FreenectTOP::getNumInfoCHOPChans(void*) {
+    if (!skeletonEnabled || !skeletonInitialized) return 0;
+    // Snapshot all person data once per cook for consistent reads
+    cachedPersons.resize(skeletonMaxPlayers);
+    for (int i = 0; i < skeletonMaxPlayers; i++) {
+        cachedPersons[i] = skeletonTracker.getPerson(i);
+    }
+    return skeletonMaxPlayers * kNumJoints * 4;
+}
+
+void FreenectTOP::getInfoCHOPChan(int32_t index, TD::OP_InfoCHOPChan* chan, void*) {
+    static const char* suffixes[4] = {":tx", ":ty", ":tz", ":tracked"};
+    const int chansPerPlayer = kNumJoints * 4;
+
+    int playerIdx = index / chansPerPlayer;
+    int withinPlayer = index % chansPerPlayer;
+    int jointIdx = withinPlayer / 4;
+    int suffixIdx = withinPlayer % 4;
+
+    char name[64];
+    snprintf(name, sizeof(name), "p%d/%s%s",
+             playerIdx + 1, kJointNames[jointIdx], suffixes[suffixIdx]);
+    chan->name->setString(name);
+
+    if (playerIdx < static_cast<int>(cachedPersons.size()) && cachedPersons[playerIdx].active) {
+        const auto& person = cachedPersons[playerIdx];
+        switch (suffixIdx) {
+            case 0: chan->value = person.joints[jointIdx].x; break;
+            case 1: chan->value = person.joints[jointIdx].y; break;
+            case 2: chan->value = person.joints[jointIdx].z; break;
+            case 3: chan->value = person.joints[jointIdx].visibility; break;
+        }
+    } else {
+        chan->value = 0.f;
+    }
+}
+
+// ───────────────────────────────────────────────────────────────
+// Info DAT: joint name reference table
+// ───────────────────────────────────────────────────────────────
+
+bool FreenectTOP::getInfoDATSize(TD::OP_InfoDATSize* infoSize, void*) {
+    if (!skeletonEnabled) return false;
+    infoSize->rows = kNumJoints + 1; // header + 33 joints
+    infoSize->cols = 3;
+    infoSize->byColumn = false;
+    return true;
+}
+
+void FreenectTOP::getInfoDATEntries(int32_t index, int32_t nEntries,
+                                     TD::OP_InfoDATEntries* entries, void*) {
+    if (index == 0) {
+        entries->values[0]->setString("index");
+        entries->values[1]->setString("name");
+        entries->values[2]->setString("description");
+        return;
+    }
+    int ji = index - 1;
+    if (ji < 0 || ji >= kNumJoints) return;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", ji);
+    entries->values[0]->setString(buf);
+    entries->values[1]->setString(kJointNames[ji]);
+    entries->values[2]->setString(kJointNames[ji]);
 }
 
 // Upload a fallback black buffer

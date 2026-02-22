@@ -25,6 +25,32 @@ COMPONENT_PKG="${PKG_WORK_DIR}/IntermediateComponent.pkg"
 FINAL_PKG="${PKG_WORK_DIR}/${PLUGIN_NAME}.pkg"
 DISTRIBUTION_XML="${PKG_WORK_DIR}/distribution.xml"
 
+# --------------------------------------------------------
+#   Bundle ONNX Runtime dylib and BlazePose models
+# --------------------------------------------------------
+
+FRAMEWORKS_DIR="${BUILD_OUTPUT}/Contents/Frameworks"
+RESOURCES_DIR="${BUILD_OUTPUT}/Contents/Resources/models"
+ONNXRT_DYLIB="${SRCROOT}/include/libs/libonnxruntime.1.20.1.dylib"
+MODELS_DIR="${SRCROOT}/models"
+
+mkdir -p "$FRAMEWORKS_DIR"
+mkdir -p "$RESOURCES_DIR"
+
+if [ -f "$ONNXRT_DYLIB" ]; then
+    cp -f "$ONNXRT_DYLIB" "$FRAMEWORKS_DIR/libonnxruntime.1.20.1.dylib"
+    cd "$FRAMEWORKS_DIR"
+    ln -sf libonnxruntime.1.20.1.dylib libonnxruntime.dylib
+    cd -
+    install_name_tool -id @rpath/libonnxruntime.1.20.1.dylib "$FRAMEWORKS_DIR/libonnxruntime.1.20.1.dylib"
+    echo "Bundled ONNX Runtime dylib"
+fi
+
+if [ -d "$MODELS_DIR" ]; then
+    cp -f "$MODELS_DIR"/*.onnx "$RESOURCES_DIR/" 2>/dev/null || true
+    echo "Bundled BlazePose ONNX models"
+fi
+
 codesign --force --deep --sign - "$BUILD_OUTPUT"
 
 if [ "${CONFIGURATION}" = "Debug" ]; then

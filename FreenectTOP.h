@@ -31,6 +31,7 @@
 
 #include "FreenectV1.h"
 #include "FreenectV2.h"
+#include "SkeletonTracker.h"
 
 enum class depthFormatEnum {
     Raw,
@@ -47,6 +48,14 @@ public:
     void getGeneralInfo   (TD::TOP_GeneralInfo* ginfo, const TD::OP_Inputs* inputs, void*) override;
     void execute          (TD::TOP_Output* output, const TD::OP_Inputs* inputs, void*) override;
     void setupParameters  (TD::OP_ParameterManager* manager, void*) override;
+
+    // Info CHOP: skeleton joint data output
+    int32_t getNumInfoCHOPChans(void*) override;
+    void    getInfoCHOPChan(int32_t index, TD::OP_InfoCHOPChan* chan, void*) override;
+
+    // Info DAT: joint name reference table
+    bool getInfoDATSize(TD::OP_InfoDATSize* infoSize, void*) override;
+    void getInfoDATEntries(int32_t index, int32_t nEntries, TD::OP_InfoDATEntries* entries, void*) override;
 
 private:
     const TD::OP_NodeInfo*                  fntdNodeInfo;
@@ -135,5 +144,12 @@ private:
     bool streamEnabledIR;
     bool streamEnabledDepth;
     bool streamEnabledPC;
-    
+
+    // Skeleton tracking
+    SkeletonTracker skeletonTracker;
+    bool skeletonEnabled = false;
+    int  skeletonMaxPlayers = 1;
+    bool skeletonInitialized = false;
+    std::string skeletonModelDir;
+    std::vector<TrackedPerson> cachedPersons; // snapshot for Info CHOP reads
 };

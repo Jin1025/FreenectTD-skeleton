@@ -9,3 +9,5 @@ logs/
 *.bin
 include/headers/touchdesigner_experimental
 notes.txt
+xcuserdata/
+*.xcuserdatad/
