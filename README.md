@@ -62,10 +62,10 @@ This means you are free to use, modify, and distribute this plugin, including in
 
 This project also includes the following third-party libraries, each under their respective licenses:
 
-libfreenect – Apache 2.0 License
+* **libfreenect** – Apache 2.0 License
 
-libfreenect2 – Apache 2.0 License
+* **libfreenect2** – Apache 2.0 License
 
-libusb – LGPL 2.1 License
+* **libusb** – LGPL 2.1 License
 
 By downloading, using, modifying, or distributing this plugin, either as source-code or binary format, you agree to comply with the terms of both the LGPL-2.1 license for the plugin itself and the respective licenses of the third-party libraries included.
