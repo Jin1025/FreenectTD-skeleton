@@ -43,6 +43,21 @@ Each joint outputs:
 
 ---
 
+## Installation
+
+### [RECOMMENDED] Installing using installer
+
+Download the latest installer build from the [releases tab](https://github.com/Jin1025/FreenectTD-skeleton/releases/latest).
+
+Right click on `FreenectTOP_Installer.pkg` and select **"Open"**.
+
+You should now find FreenectTOP under the **"Custom"** OPs panel.
+
+> [!TIP]
+> If the Installer gets blocked from running, go to **System Settings > Privacy & Security** and click on **Run Anyway**.
+
+---
+
 ## Notes
 
 - Joint coordinates are normalized (0–1 range)  
