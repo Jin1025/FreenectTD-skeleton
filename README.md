@@ -10,7 +10,7 @@ Joint positions are currently not fully accurate and may require additional filt
 
 ## Skeleton Tracking
 
-- Pose estimation powered by [MediaPipe BlazePose](https://developers.google.com/mediapipe/solutions/vision/pose)  
+- Pose estimation powered by [MediaPipe BlazePose](https://developers.google.com/mediapipe)  
 - 33 body landmarks detected  
 - RGB-based tracking only (no depth fusion)  
 - Joint data exposed to TouchDesigner via CHOP channels  
