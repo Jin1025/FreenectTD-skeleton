@@ -25,7 +25,7 @@ by adding experimental **skeleton tracking support**.
 Inside the **Custom Freenect TOP**:
 Enable Skeleton Tracking → ON
 
----
+
 ### 2. CHOP 
 
 **CHOP info **:
@@ -50,8 +50,11 @@ Each joint outputs:
 - Depth-based correction is not implemented yet  
 - Some jitter may occur due to RGB-only tracking
 
-  그러면 
+---
+## Contact
+email: allaboutmy@snu.ac.kr
 
+---
 
 ## Licensing
 FreenectTD is licensed under the GNU Lesser General Public License v2.1 (LGPL-2.1).
