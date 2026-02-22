@@ -28,8 +28,6 @@ Enable Skeleton Tracking → ON
 
 ### 2. CHOP 
 
-**CHOP info **:
-
 You will see channels like:
 p1/wrist_left:tx
 p1/wrist_left:ty
@@ -39,7 +37,9 @@ Each joint outputs:
 
 - `tx` → X position  
 - `ty` → Y position  
-- `tz` → Z position  
+- `tz` → Z position
+
+<img width="1500" height="559" alt="image" src="https://github.com/user-attachments/assets/f21ab749-a807-4c63-b217-9e10c6d605c7" />
 
 ---
 
@@ -47,7 +47,8 @@ Each joint outputs:
 
 ### [RECOMMENDED] Installing using installer
 
-Download the latest installer build from the [releases tab](https://github.com/Jin1025/FreenectTD-skeleton/releases/latest).
+Download the latest installer build from the [releases tab]([https://github.com/Jin1025/FreenectTD-skeleton/releases/latest](https://github.com/Jin1025/FreenectTD-skeleton/releases/download/v1.1/FreenectTOP_Installer.pkg)).
+
 
 Right click on `FreenectTOP_Installer.pkg` and select **"Open"**.
 
